@@ -14,6 +14,7 @@ import {
   downloadDataUrl,
   downloadAsZip,
 } from '../../utils/imageUtils';
+import { uploadFile, deleteFile } from '../../utils/storage';
 import {
   Search, Upload, Grid, List, FolderPlus, Tag, Trash2,
   Download, Check, X, Image, Plus, Filter, MoreVertical, Eye,
@@ -316,6 +317,7 @@ function DropZone({ onFilesDropped }) {
 }
 
 // --- Helper: process a single file (browser File object) ---
+// Uploads the file to R2 (web) or keeps data URL (Tauri)
 async function processFile(file) {
   const ext = getExtension(file.name);
   const name = file.name.replace(/\.[^.]+$/, '');
@@ -338,10 +340,14 @@ async function processFile(file) {
     dominantColors = await extractDominantColors(dataUrl);
   }
 
+  // Upload to R2 (web) or keep data URL (Tauri/fallback)
+  const fileUrl = await uploadFile(file, file.name);
+
   const tags = name.split(/[_\-\s]+/).filter(t => t.length > 1);
   return {
     name, slug: generateSlug(file.name), original_format: ext,
-    file_path: dataUrl, thumbnail_path: dataUrl,
+    file_path: fileUrl,
+    thumbnail_path: dataUrl, // keep local data URL for fast thumbnails
     width, height, aspect_ratio: width / height,
     has_transparency: hasTransparency,
     dominant_colors: dominantColors, tags,
@@ -603,11 +609,14 @@ export default function LogoLibrary() {
 
   const handleDeleteSelected = useCallback(async () => {
     const ids = Array.from(selectedIds);
-    for (const id of ids) {
-      await removeLogo(id);
+    const logosToDelete = logos.filter(l => ids.includes(l.id));
+    for (const logo of logosToDelete) {
+      // Delete file from R2 if stored there
+      await deleteFile(logo.file_path);
+      await removeLogo(logo.id);
     }
     showNotification(`${ids.length} loghi eliminati`, 'info');
-  }, [selectedIds, removeLogo, showNotification]);
+  }, [selectedIds, logos, removeLogo, showNotification]);
 
   const handleBatchDownload = useCallback(async () => {
     const selected = getSelectedLogos();

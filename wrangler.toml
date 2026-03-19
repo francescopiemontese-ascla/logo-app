@@ -1,0 +1,8 @@
+# Cloudflare Pages configuration for Logo App
+name = "logo-app"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-12-01"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "logo-app-storage"
